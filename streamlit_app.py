@@ -60,6 +60,28 @@ def send_telegram_msg(message):
         pass
 
 # ─────────────────────────────────────────────
+# FILTRE DE SESSION (SECURITE WEEK-END)
+# ─────────────────────────────────────────────
+def is_market_open(category):
+    if category == "CRYPTO":
+        return True
+    
+    now = datetime.datetime.now(ZoneInfo("Europe/Paris"))
+    
+    # Samedi (5) et Dimanche (6)
+    if now.weekday() >= 5:
+        # Réouverture Dimanche 23h
+        if now.weekday() == 6 and now.hour >= 23:
+            return True
+        return False
+    
+    # Vendredi soir après fermeture
+    if now.weekday() == 4 and now.hour >= 22:
+        return False
+        
+    return True
+
+# ─────────────────────────────────────────────
 # CONFIGURATION APP & ASSETS
 # ─────────────────────────────────────────────
 st.set_page_config(page_title="Sniper V19 — Swing Trend Pro", layout="wide")
@@ -96,109 +118,112 @@ def run_engine():
     data_h4 = yf.download(tickers, period="60d", interval="4h", group_by="ticker", progress=False)
     data_h1 = yf.download(tickers, period="15d", interval="1h", group_by="ticker", progress=False)
 
-    for ticker in tickers:
-        try:
-            name = ticker.replace("=X","").replace("-USD","USD")
-            
-            # --- GESTION DES TRADES ACTIFS ---
-            if name in active_trades:
-                trade = active_trades[name]
-                current_price = float(data_h1[ticker]["Close"].iloc[-1])
-                is_win, is_loss = False, False
-                if trade["type"] == "ACHAT 🚀":
-                    if current_price >= trade["tp"]: is_win = True
-                    elif current_price <= trade["sl"]: is_loss = True
-                else:
-                    if current_price <= trade["tp"]: is_win = True
-                    elif current_price >= trade["sl"]: is_loss = True
+    for category, symbols in ASSETS.items():
+        for ticker in symbols:
+            try:
+                name = ticker.replace("=X","").replace("-USD","USD")
                 
-                if is_win or is_loss:
-                    history_trades.append({
-                        "Date": datetime.datetime.now().strftime("%d/%m %H:%M"),
-                        "Actif": name, "Type": trade["type"], "Résultat": "✅ WIN" if is_win else "❌ LOSS", "RR": trade["rr"] if is_win else -1.0
-                    })
-                    save_json(HISTORY_FILE, history_trades)
-                    del active_trades[name]
-                    save_json(DB_FILE, active_trades)
-                continue
+                # SECURITE : Si le marché est fermé, on saute l'analyse pour cet actif
+                if not is_market_open(category):
+                    continue
 
-            # --- ANALYSE TECHNIQUE ---
-            df_d1 = data_d1[ticker].dropna()
-            df_h4 = data_h4[ticker].dropna()
-            df_h1 = data_h1[ticker].dropna()
-            
-            # 1. TIME FRAME D1 : Direction Majeure
-            ema200_d1 = EMAIndicator(df_d1["Close"], 200).ema_indicator().iloc[-1]
-            close_d1 = df_d1["Close"].iloc[-1]
-            
-            # 2. TIME FRAME H4 : Structure + Force (ADX)
-            ema50_h4 = EMAIndicator(df_h4["Close"], 50).ema_indicator().iloc[-1]
-            ema200_h4 = EMAIndicator(df_h4["Close"], 200).ema_indicator().iloc[-1]
-            adx_h4_obj = ADXIndicator(df_h4["High"], df_h4["Low"], df_h4["Close"], 14)
-            adx_h4 = adx_h4_obj.adx().iloc[-1]
-            
-            # 3. TIME FRAME H1 : Timing + Pullback
-            ema20_h1 = EMAIndicator(df_h1["Close"], 20).ema_indicator().iloc[-1]
-            ema50_h1 = EMAIndicator(df_h1["Close"], 50).ema_indicator().iloc[-1]
-            close_h1 = df_h1["Close"].iloc[-1]
-            atr_h1 = AverageTrueRange(df_h1["High"], df_h1["Low"], df_h1["Close"], 14).average_true_range().iloc[-1]
-            
-            # --- LOGIQUE DE TENDANCE FORTE ---
-            trend_bull = close_d1 > ema200_d1 and ema50_h4 > ema200_h4 and close_h1 > ema50_h4 and adx_h4 >= 25
-            trend_bear = close_d1 < ema200_d1 and ema50_h4 < ema200_h4 and close_h1 < ema50_h4 and adx_h4 >= 25
-            
-            signal = "ATTENDRE"
-            sl, tp, rr = None, None, 0
-            comment = "Analyse en cours"
-
-            # --- DÉTECTION PULLBACK H1 (Achat) ---
-            if trend_bull:
-                # Le prix doit être proche des EMA H1 (Pullback) et non en extension
-                if df_h1["Low"].iloc[-1] <= ema20_h1 * 1.001:
-                    signal = "ACHAT 🚀"
-                    # SL sous le dernier plus bas H1 - 0.5 ATR
-                    low_h1 = df_h1["Low"].iloc[-5:].min()
-                    sl = round(low_h1 - (atr_h1 * 0.6), 5)
-                    tp = round(close_h1 + (abs(close_h1 - sl) * 1.8), 5)
-                    comment = "Pullback haussier confirmé"
-                else:
-                    comment = "Tendance UP - En attente de repli"
-
-            # --- DÉTECTION PULLBACK H1 (Vente) ---
-            elif trend_bear:
-                if df_h1["High"].iloc[-1] >= ema20_h1 * 0.999:
-                    signal = "VENTE 🔻"
-                    high_h1 = df_h1["High"].iloc[-5:].max()
-                    sl = round(high_h1 + (atr_h1 * 0.6), 5)
-                    tp = round(close_h1 - (abs(sl - close_h1) * 1.8), 5)
-                    comment = "Pullback baissier confirmé"
-                else:
-                    comment = "Tendance DOWN - En attente de repli"
-            
-            else:
-                if adx_h4 < 25: comment = "ADX trop faible (Range)"
-                elif close_d1 > ema200_d1 and close_h1 < ema50_h4: comment = "Correction H4 en cours"
-                else: comment = "Pas d'alignement Daily/H4"
-
-            # --- VALIDATION RR ET ENREGISTREMENT ---
-            if signal != "ATTENDRE":
-                risk = abs(close_h1 - sl)
-                reward = abs(tp - close_h1)
-                rr = round(reward / risk, 2)
-                
-                if rr >= 1.5 and name not in active_trades:
-                    active_trades[name] = {"type": signal, "entry": close_h1, "sl": sl, "tp": tp, "rr": rr}
-                    save_json(DB_FILE, active_trades)
+                # --- GESTION DES TRADES ACTIFS ---
+                if name in active_trades:
+                    trade = active_trades[name]
+                    current_price = float(data_h1[ticker]["Close"].iloc[-1])
+                    is_win, is_loss = False, False
+                    if trade["type"] == "ACHAT 🚀":
+                        if current_price >= trade["tp"]: is_win = True
+                        elif current_price <= trade["sl"]: is_loss = True
+                    else:
+                        if current_price <= trade["tp"]: is_win = True
+                        elif current_price >= trade["sl"]: is_loss = True
                     
-                    msg = f"🦅 SNIPER SWING V19\n{name} | {signal}\n\n🎯 Objectif: 1-4 jours\n💰 Entrée: {round(close_h1, 5)}\n🛑 SL: {sl}\n✅ TP: {tp}\n📊 RR: {rr}\n📈 ADX H4: {round(adx_h4,1)}"
-                    send_telegram_msg(msg)
+                    if is_win or is_loss:
+                        history_trades.append({
+                            "Date": datetime.datetime.now().strftime("%d/%m %H:%M"),
+                            "Actif": name, "Type": trade["type"], "Résultat": "✅ WIN" if is_win else "❌ LOSS", "RR": trade["rr"] if is_win else -1.0
+                        })
+                        save_json(HISTORY_FILE, history_trades)
+                        del active_trades[name]
+                        save_json(DB_FILE, active_trades)
+                    continue
 
-            results.append({
-                "Actif": name, "Signal": signal, "Prix": round(close_h1, 5),
-                "ADX H4": round(adx_h4, 1), "Commentaire": comment
-            })
+                # --- ANALYSE TECHNIQUE ---
+                df_d1 = data_d1[ticker].dropna()
+                df_h4 = data_h4[ticker].dropna()
+                df_h1 = data_h1[ticker].dropna()
+                
+                # 1. TIME FRAME D1 : Direction Majeure
+                ema200_d1 = EMAIndicator(df_d1["Close"], 200).ema_indicator().iloc[-1]
+                close_d1 = df_d1["Close"].iloc[-1]
+                
+                # 2. TIME FRAME H4 : Structure + Force (ADX)
+                ema50_h4 = EMAIndicator(df_h4["Close"], 50).ema_indicator().iloc[-1]
+                ema200_h4 = EMAIndicator(df_h4["Close"], 200).ema_indicator().iloc[-1]
+                adx_h4_obj = ADXIndicator(df_h4["High"], df_h4["Low"], df_h4["Close"], 14)
+                adx_h4 = adx_h4_obj.adx().iloc[-1]
+                
+                # 3. TIME FRAME H1 : Timing + Pullback
+                ema20_h1 = EMAIndicator(df_h1["Close"], 20).ema_indicator().iloc[-1]
+                ema50_h1 = EMAIndicator(df_h1["Close"], 50).ema_indicator().iloc[-1]
+                close_h1 = df_h1["Close"].iloc[-1]
+                atr_h1 = AverageTrueRange(df_h1["High"], df_h1["Low"], df_h1["Close"], 14).average_true_range().iloc[-1]
+                
+                # --- LOGIQUE DE TENDANCE FORTE ---
+                trend_bull = close_d1 > ema200_d1 and ema50_h4 > ema200_h4 and close_h1 > ema50_h4 and adx_h4 >= 25
+                trend_bear = close_d1 < ema200_d1 and ema50_h4 < ema200_h4 and close_h1 < ema50_h4 and adx_h4 >= 25
+                
+                signal = "ATTENDRE"
+                sl, tp, rr = None, None, 0
+                comment = "Analyse en cours"
 
-        except: continue
+                # --- DÉTECTION PULLBACK H1 (Achat) ---
+                if trend_bull:
+                    if df_h1["Low"].iloc[-1] <= ema20_h1 * 1.001:
+                        signal = "ACHAT 🚀"
+                        low_h1 = df_h1["Low"].iloc[-5:].min()
+                        sl = round(low_h1 - (atr_h1 * 0.6), 5)
+                        tp = round(close_h1 + (abs(close_h1 - sl) * 1.8), 5)
+                        comment = "Pullback haussier confirmé"
+                    else:
+                        comment = "Tendance UP - En attente de repli"
+
+                # --- DÉTECTION PULLBACK H1 (Vente) ---
+                elif trend_bear:
+                    if df_h1["High"].iloc[-1] >= ema20_h1 * 0.999:
+                        signal = "VENTE 🔻"
+                        high_h1 = df_h1["High"].iloc[-5:].max()
+                        sl = round(high_h1 + (atr_h1 * 0.6), 5)
+                        tp = round(close_h1 - (abs(sl - close_h1) * 1.8), 5)
+                        comment = "Pullback baissier confirmé"
+                    else:
+                        comment = "Tendance DOWN - En attente de repli"
+                
+                else:
+                    if adx_h4 < 25: comment = "ADX trop faible (Range)"
+                    elif close_d1 > ema200_d1 and close_h1 < ema50_h4: comment = "Correction H4 en cours"
+                    else: comment = "Pas d'alignement Daily/H4"
+
+                # --- VALIDATION RR ET ENREGISTREMENT ---
+                if signal != "ATTENDRE":
+                    risk = abs(close_h1 - sl)
+                    reward = abs(tp - close_h1)
+                    rr = round(reward / risk, 2)
+                    
+                    if rr >= 1.5 and name not in active_trades:
+                        active_trades[name] = {"type": signal, "entry": close_h1, "sl": sl, "tp": tp, "rr": rr}
+                        save_json(DB_FILE, active_trades)
+                        
+                        msg = f"🦅 SNIPER SWING V19\n{name} | {signal}\n\n🎯 Objectif: 1-4 jours\n💰 Entrée: {round(close_h1, 5)}\n🛑 SL: {sl}\n✅ TP: {tp}\n📊 RR: {rr}\n📈 ADX H4: {round(adx_h4,1)}"
+                        send_telegram_msg(msg)
+
+                results.append({
+                    "Actif": name, "Signal": signal, "Prix": round(close_h1, 5),
+                    "ADX H4": round(adx_h4, 1), "Commentaire": comment
+                })
+
+            except: continue
     return results
 
 # ─────────────────────────────────────────────
@@ -222,6 +247,8 @@ st.header("🎯 Radar de Tendance (Triple Alignement)")
 data_results = run_engine()
 if data_results:
     st.dataframe(pd.DataFrame(data_results), use_container_width=True)
+else:
+    st.warning("Marché Forex fermé. Seules les Cryptos sont analysées le week-end.")
 
 # Barre latérale
 with st.sidebar:
