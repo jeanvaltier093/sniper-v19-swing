@@ -113,10 +113,10 @@ def run_engine():
     results = []
     tickers = [t for cat in ASSETS.values() for t in cat]
     
-    # Téléchargement multi-TF
-    data_d1 = yf.download(tickers, period="250d", interval="1d", group_by="ticker", progress=False)
-    data_h4 = yf.download(tickers, period="60d", interval="4h", group_by="ticker", progress=False)
-    data_h1 = yf.download(tickers, period="15d", interval="1h", group_by="ticker", progress=False)
+    # Téléchargement multi-TF (Correction threads=False pour stabilité Streamlit Cloud)
+    data_d1 = yf.download(tickers, period="250d", interval="1d", group_by="ticker", progress=False, threads=False)
+    data_h4 = yf.download(tickers, period="60d", interval="4h", group_by="ticker", progress=False, threads=False)
+    data_h1 = yf.download(tickers, period="15d", interval="1h", group_by="ticker", progress=False, threads=False)
 
     for category, symbols in ASSETS.items():
         for ticker in symbols:
@@ -248,7 +248,7 @@ data_results = run_engine()
 if data_results:
     st.dataframe(pd.DataFrame(data_results), use_container_width=True)
 else:
-    st.warning("Marché Forex fermé. Seules les Cryptos sont analysées le week-end.")
+    st.warning("Marché Forex fermé ou analyse en attente de données.")
 
 # Barre latérale
 with st.sidebar:
