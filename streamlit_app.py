@@ -107,7 +107,7 @@ def pip_factor(pair):
     return 100 if "JPY" in pair else 10000
 
 # ─────────────────────────────────────────────
-# MOTEUR DE STRATÉGIE SWING (1-4 JOURS)
+# MOTEUR DE STRATÉGIE SWING ELITE (1-4 JOURS)
 # ─────────────────────────────────────────────
 def run_engine():
     results = []
@@ -123,7 +123,7 @@ def run_engine():
             try:
                 name = ticker.replace("=X","").replace("-USD","USD")
                 
-                # SECURITE : Si le marché est fermé, on saute l'analyse pour cet actif
+                # SECURITE : Si le marché est fermé, on saute l'analyse
                 if not is_market_open(category):
                     continue
 
@@ -156,54 +156,56 @@ def run_engine():
                 
                 # 1. TIME FRAME D1 : Direction Majeure
                 ema200_d1 = EMAIndicator(df_d1["Close"], 200).ema_indicator().iloc[-1]
-                close_d1 = df_d1["Close"].iloc[-1]
                 
-                # 2. TIME FRAME H4 : Structure + Force (ADX)
+                # 2. TIME FRAME H4 : Force (ADX Dynamique)
                 ema50_h4 = EMAIndicator(df_h4["Close"], 50).ema_indicator().iloc[-1]
                 ema200_h4 = EMAIndicator(df_h4["Close"], 200).ema_indicator().iloc[-1]
-                adx_h4_obj = ADXIndicator(df_h4["High"], df_h4["Low"], df_h4["Close"], 14)
-                adx_h4 = adx_h4_obj.adx().iloc[-1]
+                adx_obj_h4 = ADXIndicator(df_h4["High"], df_h4["Low"], df_h4["Close"], 14)
+                adx_h4 = adx_obj_h4.adx().iloc[-1]
+                adx_prev_h4 = adx_obj_h4.adx().iloc[-5] # Force il y a 20 heures
                 
-                # 3. TIME FRAME H1 : Timing + Pullback
+                # 3. TIME FRAME H1 : Timing + Pullback Confirmé
                 ema20_h1 = EMAIndicator(df_h1["Close"], 20).ema_indicator().iloc[-1]
-                ema50_h1 = EMAIndicator(df_h1["Close"], 50).ema_indicator().iloc[-1]
                 close_h1 = df_h1["Close"].iloc[-1]
+                prev_close_h1 = df_h1["Close"].iloc[-2]
                 atr_h1 = AverageTrueRange(df_h1["High"], df_h1["Low"], df_h1["Close"], 14).average_true_range().iloc[-1]
                 
-                # --- LOGIQUE DE TENDANCE FORTE ---
-                trend_bull = close_d1 > ema200_d1 and ema50_h4 > ema200_h4 and close_h1 > ema50_h4 and adx_h4 >= 25
-                trend_bear = close_d1 < ema200_d1 and ema50_h4 < ema200_h4 and close_h1 < ema50_h4 and adx_h4 >= 25
+                # --- LOGIQUE DE TENDANCE DURCIE (Elite Filter) ---
+                # On veut un ADX > 25 et qui est en train de monter (Accélération)
+                is_trending = adx_h4 >= 25 and adx_h4 > adx_prev_h4
                 
-                signal = "ATTENDRE"
-                sl, tp, rr = None, None, 0
-                comment = "Analyse en cours"
+                trend_bull = close_h1 > ema200_d1 and ema50_h4 > ema200_h4 and is_trending
+                trend_bear = close_h1 < ema200_d1 and ema50_h4 < ema200_h4 and is_trending
+                
+                signal, sl, tp, rr, comment = "ATTENDRE", None, None, 0, "Analyse en cours"
 
-                # --- DÉTECTION PULLBACK H1 (Achat) ---
+                # --- DÉTECTION REJET PULLBACK H1 (Achat) ---
                 if trend_bull:
-                    if df_h1["Low"].iloc[-1] <= ema20_h1 * 1.001:
+                    # On entre quand le prix REPASSE au dessus de l'EMA 20 (Rejet de mèche confirmé)
+                    if prev_close_h1 <= ema20_h1 and close_h1 > ema20_h1:
                         signal = "ACHAT 🚀"
-                        low_h1 = df_h1["Low"].iloc[-5:].min()
-                        sl = round(low_h1 - (atr_h1 * 0.6), 5)
-                        tp = round(close_h1 + (abs(close_h1 - sl) * 1.8), 5)
-                        comment = "Pullback haussier confirmé"
+                        low_h1 = df_h1["Low"].iloc[-10:].min()
+                        sl = round(low_h1 - (atr_h1 * 1.5), 5) # SL Large (1.5x ATR)
+                        tp = round(close_h1 + (abs(close_h1 - sl) * 2.0), 5) # TP à 2RR
+                        comment = "Rejet Pullback confirmé"
                     else:
-                        comment = "Tendance UP - En attente de repli"
+                        comment = "Tendance UP - Attente Rejet EMA20"
 
-                # --- DÉTECTION PULLBACK H1 (Vente) ---
+                # --- DÉTECTION REJET PULLBACK H1 (Vente) ---
                 elif trend_bear:
-                    if df_h1["High"].iloc[-1] >= ema20_h1 * 0.999:
+                    if prev_close_h1 >= ema20_h1 and close_h1 < ema20_h1:
                         signal = "VENTE 🔻"
-                        high_h1 = df_h1["High"].iloc[-5:].max()
-                        sl = round(high_h1 + (atr_h1 * 0.6), 5)
-                        tp = round(close_h1 - (abs(sl - close_h1) * 1.8), 5)
-                        comment = "Pullback baissier confirmé"
+                        high_h1 = df_h1["High"].iloc[-10:].max()
+                        sl = round(high_h1 + (atr_h1 * 1.5), 5)
+                        tp = round(close_h1 - (abs(sl - close_h1) * 2.0), 5)
+                        comment = "Rejet Pullback confirmé"
                     else:
-                        comment = "Tendance DOWN - En attente de repli"
+                        comment = "Tendance DOWN - Attente Rejet EMA20"
                 
                 else:
                     if adx_h4 < 25: comment = "ADX trop faible (Range)"
-                    elif close_d1 > ema200_d1 and close_h1 < ema50_h4: comment = "Correction H4 en cours"
-                    else: comment = "Pas d'alignement Daily/H4"
+                    elif adx_h4 <= adx_prev_h4: comment = "Tendance s'essouffle (ADX baisse)"
+                    else: comment = "Pas d'alignement Multi-TF"
 
                 # --- VALIDATION RR ET ENREGISTREMENT ---
                 if signal != "ATTENDRE":
@@ -215,7 +217,7 @@ def run_engine():
                         active_trades[name] = {"type": signal, "entry": close_h1, "sl": sl, "tp": tp, "rr": rr}
                         save_json(DB_FILE, active_trades)
                         
-                        msg = f"🦅 SNIPER SWING V19\n{name} | {signal}\n\n🎯 Objectif: 1-4 jours\n💰 Entrée: {round(close_h1, 5)}\n🛑 SL: {sl}\n✅ TP: {tp}\n📊 RR: {rr}\n📈 ADX H4: {round(adx_h4,1)}"
+                        msg = f"🦅 SNIPER ELITE V19\n{name} | {signal}\n\n🎯 Objectif: SWING\n💰 Entrée: {round(close_h1, 5)}\n🛑 SL (Structurel): {sl}\n✅ TP: {tp}\n📊 RR: {rr}\n📈 ADX: {round(adx_h4,1)}"
                         send_telegram_msg(msg)
 
                 results.append({
@@ -243,16 +245,16 @@ if history_trades:
         st.table(df_h.tail(15))
 
 # Tableau des signaux
-st.header("🎯 Radar de Tendance (Triple Alignement)")
+st.header("🎯 Radar de Tendance (Triple Alignement Elite)")
 data_results = run_engine()
 if data_results:
     st.dataframe(pd.DataFrame(data_results), use_container_width=True)
 else:
-    st.warning("Marché Forex fermé ou analyse en attente de données.")
+    st.warning("Marché Forex fermé ou analyse en cours.")
 
 # Barre latérale
 with st.sidebar:
-    st.info("Stratégie : Daily Trend + H4 ADX + H1 Pullback")
+    st.info("Stratégie : Daily Trend + H4 ADX Accel + H1 Candle Rejection")
     if st.button("🗑 Réinitialiser Verrous"):
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
         st.success("Verrous supprimés")
@@ -260,5 +262,5 @@ with st.sidebar:
         if os.path.exists(HISTORY_FILE): os.remove(HISTORY_FILE)
         st.success("Historique vidé")
     if st.button("📩 Test Telegram"):
-        send_telegram_msg("✅ Sniper V19 opérationnel")
+        send_telegram_msg("✅ Sniper V19 ELITE opérationnel")
         st.toast("Message envoyé")
