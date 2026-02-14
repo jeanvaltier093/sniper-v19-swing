@@ -214,7 +214,7 @@ def run_engine():
                 if signal != "ATTENDRE":
                     risk = abs(close_h1 - sl)
                     reward = abs(tp - close_h1)
-                    rr = round(reward / risk, 2)
+                    rr = round(reward / (risk + 1e-9), 2)
                     
                     if rr >= 1.5 and name not in active_trades:
                         active_trades[name] = {"type": signal, "entry": close_h1, "sl": sl, "tp": tp, "rr": rr}
@@ -253,14 +253,29 @@ if data_results:
 
 with st.sidebar:
     st.info("Stratégie : Daily Trend + H4 ADX Accel + H1 Candle Rejection")
+    
+    st.write("---")
+    st.subheader("🛠 Diagnostic & Maintenance")
+    
+    # BOUTON DE TEST DE CONNEXION GITHUB
+    if st.button("🔧 Forcer Test Connexion GitHub"):
+        try:
+            test_data = {"test_date": datetime.datetime.now().isoformat(), "status": "Connexion Active"}
+            save_json("test_connection.json", test_data)
+            st.success("Tentative d'écriture réussie ! Vérifie ton GitHub pour le fichier 'test_connection.json'")
+        except Exception as e:
+            st.error(f"Erreur : {e}")
+
     if st.button("🗑 Réinitialiser Verrous"):
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
         st.success("Verrous supprimés")
+        
     if st.button("🔴 Effacer Historique"):
         if os.path.exists(HISTORY_FILE):
             os.remove(HISTORY_FILE)
             save_json(HISTORY_FILE, [])
         st.success("Historique vidé")
+        
     if st.button("📩 Test Telegram"):
         send_telegram_msg("✅ Sniper V19 ELITE opérationnel")
         st.toast("Message envoyé")
