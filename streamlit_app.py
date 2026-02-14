@@ -30,9 +30,10 @@ def sync_to_github(file_path, data):
         payload = {"message": f"Update {file_path} Sniper V19", "content": content}
         if sha: payload["sha"] = sha
         
-        requests.put(url, headers=headers, json=payload)
-    except:
-        pass
+        put_res = requests.put(url, headers=headers, json=payload)
+        return put_res # Retourne la réponse pour le diagnostic
+    except Exception as e:
+        return str(e)
 
 # ─────────────────────────────────────────────
 # GESTION DES FICHIERS JSON (AVEC SECURITE INITIALE)
@@ -58,7 +59,7 @@ def load_json(file):
 def save_json(file, data):
     with open(file, "w") as f:
         json.dump(data, f)
-    sync_to_github(file, data)
+    return sync_to_github(file, data) # Modifié pour retourner le résultat au diagnostic
 
 # ─────────────────────────────────────────────
 # TELEGRAM
@@ -257,14 +258,21 @@ with st.sidebar:
     st.write("---")
     st.subheader("🛠 Diagnostic & Maintenance")
     
-    # BOUTON DE TEST DE CONNEXION GITHUB
+    # BOUTON DE TEST DE CONNEXION GITHUB AMÉLIORÉ
     if st.button("🔧 Forcer Test Connexion GitHub"):
         try:
             test_data = {"test_date": datetime.datetime.now().isoformat(), "status": "Connexion Active"}
-            save_json("test_connection.json", test_data)
-            st.success("Tentative d'écriture réussie ! Vérifie ton GitHub pour le fichier 'test_connection.json'")
+            result = save_json("test_connection.json", test_data)
+            
+            if isinstance(result, requests.Response):
+                if result.status_code in [200, 201]:
+                    st.success("✅ SUCCESS ! Fichier créé sur GitHub.")
+                else:
+                    st.error(f"❌ Erreur GitHub {result.status_code}: {result.text}")
+            else:
+                st.error(f"❌ Erreur Système : {result}")
         except Exception as e:
-            st.error(f"Erreur : {e}")
+            st.error(f"❌ Erreur Critique : {e}")
 
     if st.button("🗑 Réinitialiser Verrous"):
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
