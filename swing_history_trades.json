@@ -5,5 +5,12 @@
         "Type": "VENTE \ud83d\udd3b",
         "R\u00e9sultat": "\u274c LOSS",
         "RR": -1.0
+    },
+    {
+        "Date": "18/02 18:47",
+        "Actif": "EURUSD",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u274c LOSS",
+        "RR": -1.0
     }
 ]
