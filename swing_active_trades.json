@@ -1,11 +1,4 @@
 {
-    "CADCHF": {
-        "type": "VENTE \ud83d\udd3b",
-        "entry": 0.5643799901008606,
-        "sl": 0.56695,
-        "tp": 0.55924,
-        "rr": 2.0
-    },
     "USDCAD": {
         "type": "VENTE \ud83d\udd3b",
         "entry": 1.3645000457763672,
