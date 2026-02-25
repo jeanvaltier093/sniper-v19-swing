@@ -13,13 +13,6 @@
         "tp": 1.0349,
         "rr": 2.0
     },
-    "GBPUSD": {
-        "type": "ACHAT \ud83d\ude80",
-        "entry": 1.345913052558899,
-        "sl": 1.34157,
-        "tp": 1.3546,
-        "rr": 2.0
-    },
     "USDCHF": {
         "type": "VENTE \ud83d\udd3b",
         "entry": 0.7751500010490417,
