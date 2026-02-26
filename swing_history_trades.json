@@ -33,5 +33,12 @@
         "Type": "ACHAT \ud83d\ude80",
         "R\u00e9sultat": "\u2705 WIN",
         "RR": 2.0
+    },
+    {
+        "Date": "26/02 09:14",
+        "Actif": "CHFJPY",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u274c LOSS",
+        "RR": -1.0
     }
 ]
