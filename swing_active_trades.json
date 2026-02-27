@@ -6,13 +6,6 @@
         "tp": 1.34974,
         "rr": 2.0
     },
-    "USDCHF": {
-        "type": "VENTE \ud83d\udd3b",
-        "entry": 0.7751500010490417,
-        "sl": 0.77821,
-        "tp": 0.76903,
-        "rr": 2.0
-    },
     "NZDUSD": {
         "type": "ACHAT \ud83d\ude80",
         "entry": 0.5961962938308716,
