@@ -6,13 +6,6 @@
         "tp": 1.34974,
         "rr": 2.0
     },
-    "NZDUSD": {
-        "type": "ACHAT \ud83d\ude80",
-        "entry": 0.5961962938308716,
-        "sl": 0.59271,
-        "tp": 0.60317,
-        "rr": 2.0
-    },
     "GBPAUD": {
         "type": "VENTE \ud83d\udd3b",
         "entry": 1.9029500484466553,
