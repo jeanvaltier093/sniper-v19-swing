@@ -75,5 +75,12 @@
         "Type": "ACHAT \ud83d\ude80",
         "R\u00e9sultat": "\u2705 WIN",
         "RR": 2.0
+    },
+    {
+        "Date": "02/03 12:08",
+        "Actif": "NZDCAD",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u274c LOSS",
+        "RR": -1.0
     }
 ]
