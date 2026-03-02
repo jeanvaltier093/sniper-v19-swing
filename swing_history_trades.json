@@ -68,5 +68,12 @@
         "Type": "ACHAT \ud83d\ude80",
         "R\u00e9sultat": "\u274c LOSS",
         "RR": -1.0
+    },
+    {
+        "Date": "02/03 12:03",
+        "Actif": "CADJPY",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u2705 WIN",
+        "RR": 2.0
     }
 ]
