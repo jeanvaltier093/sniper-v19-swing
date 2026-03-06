@@ -110,5 +110,12 @@
         "Type": "ACHAT \ud83d\ude80",
         "R\u00e9sultat": "\u2705 WIN",
         "RR": 2.0
+    },
+    {
+        "Date": "06/03 11:56",
+        "Actif": "NZDCHF",
+        "Type": "VENTE \ud83d\udd3b",
+        "R\u00e9sultat": "\u2705 WIN",
+        "RR": 2.0
     }
 ]
