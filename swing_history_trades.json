@@ -124,5 +124,12 @@
         "Type": "VENTE \ud83d\udd3b",
         "R\u00e9sultat": "\u2705 WIN",
         "RR": 2.0
+    },
+    {
+        "Date": "09/03 07:08",
+        "Actif": "USDJPY",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u2705 WIN",
+        "RR": 2.0
     }
 ]
