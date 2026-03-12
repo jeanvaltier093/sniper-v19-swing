@@ -159,5 +159,12 @@
         "Type": "VENTE \ud83d\udd3b",
         "R\u00e9sultat": "\u274c LOSS",
         "RR": -1.0
+    },
+    {
+        "Date": "12/03 14:38",
+        "Actif": "AUDCAD",
+        "Type": "ACHAT \ud83d\ude80",
+        "R\u00e9sultat": "\u274c LOSS",
+        "RR": -1.0
     }
 ]
